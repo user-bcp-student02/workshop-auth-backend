@@ -1,6 +1,7 @@
 package com.bcp.workshop.auth;
 
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.POST;
 import jakarta.ws.rs.Path;
@@ -19,6 +20,9 @@ public class AuthResource {
     @Inject
     LegacyDatabase database;
 
+    @ConfigProperty(name = "workshop.token.secret")
+    String tokenSecret;
+
     @POST
     @Path("/login")
     public Response login(LoginRequest request) {
@@ -36,7 +40,7 @@ public class AuthResource {
                         if (user == null) {
                             return Response.status(401).entity(Map.of("message", "Invalid user " + request.username + " or password")).build();
                         } else {
-                            String token = LegacyTokenUtil.create(user.username(), user.role());
+                            String token = LegacyTokenUtil.create(user.username(), user.role(), tokenSecret);
                             Map<String, Object> response = new HashMap<>();
                             response.put("token", token);
                             response.put("expiresIn", 3600);

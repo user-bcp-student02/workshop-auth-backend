@@ -14,6 +14,8 @@ mvn quarkus:dev
 
 Servicio: `http://localhost:8080`
 
+La autenticacion requiere `WORKSHOP_TOKEN_SECRET`: configura el mismo valor aleatorio, de al menos 32 bytes, en Auth Backend y Requirements API. El token usa HS256 y el emisor `workshop-auth-backend`; no guardes el secreto en el repositorio.
+
 Credenciales locales:
 
 - `student` / `Workshop123!`
