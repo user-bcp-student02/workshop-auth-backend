@@ -2,11 +2,11 @@
 
 ## Purpose
 
-Preservar los comportamientos HTTP del Dia 1 no cambiados por el Issue #12, distinguiendo las nuevas obligaciones del token y la politica de cliente aun pendiente.
+Preservar los comportamientos HTTP del Dia 1 no cambiados por el Issue #12, distinguiendo las nuevas obligaciones del token y la politica de cliente aprobada en revision.
 
 Baseline: [docs/ENDPOINTS.md](../../../../../docs/ENDPOINTS.md).
 Fuente del cambio: [Issue #12](https://github.com/user-bcp-student02/workshop-auth-backend/issues/12).
-Los escenarios de login con credenciales incluyen un `client` valido, por ejemplo `angular-workshop`; no resuelven la omision de `client`. El formato legacy del token queda sustituido por la capacidad `signed-auth-tokens`.
+La revision humana del 2026-10-21 aprueba `client` obligatorio y validado despues de autenticar. Esto cambia explicitamente el client opcional e ignorado del Dia 1. El formato legacy del token queda sustituido por la capacidad `signed-auth-tokens`.
 
 ## ADDED Requirements
 
@@ -25,6 +25,23 @@ El servicio SHALL conservar `POST /auth/login` sin autenticacion previa, entrada
 #### Scenario: Campos desconocidos no controlan identidad
 - **WHEN** una solicitud valida agrega campos desconocidos como `role` o `sub`
 - **THEN** se ignoran esos campos y la identidad de respuesta y el sujeto del token corresponden al usuario autenticado
+
+### Requirement: Cliente obligatorio respeta la prioridad de credenciales
+Tras autenticar, el servicio SHALL exigir `client` string no vacio ni solo blancos segun `String.trim()`. Ausencia, null, vacio o solo blancos SHALL devolver 400 con `{"message":"Client is required"}`, sin token. SHALL conservar exactamente strings validos, sin normalizacion ni lista de permitidos. Las validaciones existentes y el 401 de autenticacion SHALL preceder a esta validacion.
+
+#### Scenario: Cliente requerido con credenciales validas
+- **WHEN** las credenciales son validas y `client` falta, es null, vacio o solo blancos
+- **THEN** se obtiene 400 con `{"message":"Client is required"}` y sin token
+
+#### Scenario: Credenciales invalidas no quedan ocultas por cliente
+- **WHEN** las credenciales son incorrectas y `client` falta o es invalido
+- **THEN** se obtiene el 401 y mensaje documentados, no el nuevo 400 de cliente
+- **AND** si request, username o password no superan sus validaciones, prevalecen sus 400 existentes
+
+#### Scenario: Cliente valido se conserva sin recortar
+- **WHEN** se autentica con `client` igual a ` angular-workshop ` o con otro string no vacio ni solo blancos
+- **THEN** se obtiene 200 y el claim `client` conserva exactamente ese valor, incluidos espacios y mayusculas
+- **AND** no se rechaza por no pertenecer a una lista de clientes
 
 ### Requirement: Validacion de credenciales conserva orden y mensajes
 El servicio SHALL conservar el orden request, username, password y sus errores 400 del Dia 1. Ausencia, null, cadena vacia o solo blancos segun `String.trim()` invalidan las credenciales. La nueva validacion de `client` SHALL NOT ocultar estos errores preexistentes.

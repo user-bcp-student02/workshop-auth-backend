@@ -6,7 +6,7 @@ Definir las garantias observables de integridad, identidad, cliente, vigencia y 
 
 Fuente: [Issue #12](https://github.com/user-bcp-student02/workshop-auth-backend/issues/12).
 Baseline: [docs/ENDPOINTS.md](../../../../../docs/ENDPOINTS.md).
-La firma y los claims sustituyen explicitamente el token legacy sin firma. La comprobacion de tokens descrita aqui es una condicion verificable del token, no un nuevo endpoint ni una garantia sobre consumidores no inspeccionados. La politica de `client` ausente o invalido sigue pendiente en la propuesta.
+La firma y los claims sustituyen explicitamente el token legacy sin firma. La comprobacion de tokens descrita aqui es una condicion verificable del token, no un nuevo endpoint ni una garantia sobre consumidores no inspeccionados. La politica de `client` esta aprobada y concretada en `login-contract`.
 
 ## ADDED Requirements
 
@@ -42,19 +42,22 @@ Todo token emitido SHALL contener `sub`, `client`, `iat` y `exp`. `sub` SHALL co
 - **THEN** cada token refleja el identificador de su solicitud y no un cliente fijo
 
 ### Requirement: Cliente se valida antes de emitir
-El sistema SHALL validar el `client` de la solicitud antes de incorporarlo al token y SHALL NOT emitir un token para un cliente rechazado por la politica acordada. La obligatoriedad, los valores admitidos, la normalizacion y el error HTTP no quedan decididos por esta propuesta; deben concretarse como escenarios antes de implementar, preservando los errores de credenciales protegidos.
+El sistema SHALL validar `client` tras autenticar y antes de emitir, conforme a `login-contract`. SHALL rechazar ausencia, null, vacio o solo blancos segun `String.trim()`, sin emitir token. SHALL aceptar los demas strings sin normalizacion ni lista de permitidos y reflejarlos exactamente en el claim, preservando la prioridad de errores de credenciales.
 
 #### Scenario: Cliente valido se refleja sin sustitucion
 - **WHEN** las credenciales y el cliente enviado superan sus validaciones
 - **THEN** se emite un token cuyo claim `client` corresponde al identificador validado de esa solicitud
 
 #### Scenario: Cliente rechazado no obtiene token
-- **WHEN** una solicitud con credenciales validas contiene un cliente rechazado segun la politica que se acuerde
-- **THEN** no se devuelve un token de autenticacion
-- **AND** el caso concreto y su status/cuerpo HTTP deben quedar documentados y probados antes de aceptar la implementacion; esta propuesta no asigna un codigo nuevo
+- **WHEN** una solicitud con credenciales validas omite `client` o lo envia null, vacio o solo blancos
+- **THEN** se obtiene 400 con `{"message":"Client is required"}` y sin token
+
+#### Scenario: Cliente no se normaliza ni sustituye
+- **WHEN** se autentica con `client` igual a ` Angular-Workshop `
+- **THEN** el token firmado contiene exactamente ` Angular-Workshop ` como cliente, sin recortes, cambios de mayusculas ni sustitucion por una constante
 
 ### Requirement: Expiracion y duracion declarada son coherentes
-El sistema SHALL preservar `expiresIn = 3600` segundos y emitir `exp - iat = 3600`. Al instante de emision observado `now`, con el mismo reloj de referencia, SHALL cumplirse `abs(expiresIn - (exp - now)) <= 2` segundos. Esta tolerancia propuesta cubre granularidad/observacion, no tiempo de red ni ampliacion de la validez tras `exp`.
+El sistema SHALL preservar `expiresIn = 3600` segundos y emitir `exp - iat = 3600`. Al instante de emision observado `now`, con el mismo reloj de referencia, SHALL cumplirse `abs(expiresIn - (exp - now)) <= 2` segundos. Esta tolerancia aprobada cubre granularidad/observacion, no tiempo de red ni ampliacion de la validez tras `exp`.
 
 #### Scenario: Coherencia con reloj controlado
 - **WHEN** se emite un token con reloj de referencia fijado en el segundo Unix `t`

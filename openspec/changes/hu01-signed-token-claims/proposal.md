@@ -8,10 +8,11 @@ El [Issue #12: HU-01 - Token firmado con expiracion y claims minimos](https://gi
 
 - **BREAKING**: sustituir el comportamiento del token legacy por un token firmado con `sub`, `client`, `iat` y `exp`; no prometer compatibilidad con la decodificacion del formato anterior.
 - Obtener `sub` de la identidad autenticada y `client` de la solicitud validada, sin inventar un cliente ni aceptar identidad desde campos adicionales.
-- Preservar la duracion declarada de 3600 segundos y exigir coherencia con la expiracion. Se propone tolerancia de 2 segundos, medida al emitir con el mismo reloj, no tras el transporte HTTP.
+- **BREAKING**, aprobado en revision el 2026-10-21: `client` pasa de opcional a obligatorio. Tras autenticar, ausencia, null, vacio o solo blancos devuelven 400 con `{"message":"Client is required"}`; los strings validos se conservan exactamente, sin normalizacion ni lista de permitidos. Los 400/401 existentes mantienen prioridad.
+- Preservar la duracion declarada de 3600 segundos y exigir coherencia con la expiracion. Se confirma tolerancia de 2 segundos, medida al emitir con el mismo reloj, no tras el transporte HTTP ni como extension de validez.
 - Rechazar tokens alterados o expirados en la comprobacion de validez, sin agregar un endpoint de verificacion ni atribuir esa comprobacion a `/q/health`.
 - Documentar la configuracion de `AUTH_TOKEN_SECRET`; cualquier secreto por defecto debe quedar explicitamente limitado al laboratorio. No exponer secretos en el token ni registrar tokens, secretos o valores sensibles.
-- Exigir evidencia de login valido, credenciales invalidas, claims, expiracion, configuracion y logs redactados. La decision HMAC frente a una libreria JWT queda pendiente de una etapa posterior, como exige el Issue.
+- Exigir evidencia de login valido, credenciales invalidas, claims, expiracion, configuracion y logs redactados. La decision tecnica sobre HMAC y libreria JWT se documenta en design.md, como exige el Issue.
 
 ## Capabilities
 
@@ -26,7 +27,7 @@ Ninguna: el inventario `openspec/specs/` no contiene capacidades previas. Las nu
 
 ## Impact
 
-El alcance se limita a `workshop-auth-backend`, su `POST /auth/login`, emision/comprobacion de tokens, configuracion, pruebas y documentacion de evidencia. Esta entrega contiene solo propuesta y specs, sin cambios funcionales, dependencias, diseno tecnico ni tareas.
+El alcance se limita a `workshop-auth-backend`, su `POST /auth/login`, emision/comprobacion de tokens, configuracion, pruebas y documentacion de evidencia. La planificacion incluye propuesta, specs, diseno y checklist; el Issue sigue siendo la unidad de trabajo del producto. Crear esos artefactos no autoriza iniciar implementacion funcional.
 
 ### Baseline y comportamiento protegido
 
@@ -36,12 +37,12 @@ El Issue describe HMAC y `AUTH_TOKEN_SECRET` como existentes, pero el login insp
 
 ### Fuera de alcance
 
-Nuevos endpoints, refresh/revocacion, autorizacion por roles, cambios de almacenamiento o hashing de passwords, saneamiento de errores/debug, CORS, rate limiting, checks de salud adicionales, migracion de consumidores y cualquier otro repositorio. No se eligen algoritmo, formato JWT, libreria, clases ni estrategia de implementacion.
+Nuevos endpoints, refresh/revocacion, autorizacion por roles, cambios de almacenamiento o hashing de passwords, saneamiento de errores/debug, CORS, rate limiting, checks de salud adicionales, migracion de consumidores y cualquier otro repositorio. Las decisiones tecnicas pertenecen a design.md, no a esta propuesta.
 
-### Riesgos, supuestos y decisiones pendientes
+### Riesgos y acuerdos de revision
 
-- El Issue exige validar `client` pero no define obligatoriedad, valores admitidos, normalizacion ni respuesta de error. No se inventa esa politica: las specs cubren solicitudes con `client` valido y exigen validacion, pero la omision (antes permitida) y los casos invalidos requieren acuerdo antes de implementar. No queda aprobado un cambio silencioso de opcional a obligatorio.
-- La tolerancia propuesta de 2 segundos y la comprobacion de expiracion con reloj controlado requieren revision; no se garantiza un plazo de transporte de red.
-- La politica concreta del secreto de laboratorio y la decision HMAC frente a libreria JWT se documentaran posteriormente, sin ampliar el alcance del Issue.
+- La revision humana del 2026-10-21 concreta la validacion de `client` descrita arriba y sus escenarios, incluido 401 para credenciales invalidas aunque falte `client`. No se inventan clientes por defecto ni se cambia el baseline historico del Dia 1.
+- Se confirma el margen de coherencia de 2 segundos con reloj controlado; el token es invalido desde `exp` y no se garantiza un plazo de transporte de red.
+- El diseno documenta HS256 con Nimbus y secreto obligatorio sin default, sin ampliar el alcance del Issue.
 - Se conservan defectos del baseline no incluidos en el Issue, como `debug` y detalles de errores 500. No implica aprobarlos para produccion.
-- La aceptacion funcional requerira pruebas y evidencia de logs con datos sinteticos. La validacion OpenSpec solo comprueba los artefactos; esta propuesta no esta lista para implementacion mientras sigan pendientes las decisiones de contrato anteriores.
+- La aceptacion funcional requerira pruebas y evidencia de logs con datos sinteticos. La validacion OpenSpec solo comprueba los artefactos; cualquier discrepancia previa de comportamiento requiere revision antes de tocar ese flujo critico. La implementacion necesita una solicitud posterior.
