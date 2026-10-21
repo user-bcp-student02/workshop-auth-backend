@@ -28,37 +28,37 @@ Ejecutar solo en `workshop-auth-backend`, rama `feature/HU01`, con datos sinteti
 
 ## 3. Emision incremental con reloj controlado
 
-- [ ] 3.1 Agregar pruebas unitarias del contrato de emision con Clock fijo para sub, client, iat, exp, expiresIn y dos clientes validos distintos; verificar que fallan por la funcionalidad aun ausente, manteniendo verde la caracterizacion.
-- [ ] 3.2 Implementar el servicio CDI de tokens con Clock inyectable, firma HS256 mediante Nimbus y resultado token/duracion, sin conexion aun al login; verificar que pasan las pruebas de emision y `exp - iat = expiresIn = 3600` usando una sola captura temporal.
-- [ ] 3.3 Probar cliente con espacios externos y mayusculas y revisar datos recuperables del token; verificar preservacion exacta de client y ausencia de secreto, password, hash y displayName en el payload.
-- [ ] 3.4 Probar la coherencia `abs(expiresIn - (exp - now)) <= 2` en el instante de emision con reloj controlado; verificar resultados deterministas sin esperas ni medicion de latencia de red y documentar la referencia temporal junto a esa evidencia.
+- [x] 3.1 Agregar pruebas unitarias del contrato de emision con Clock fijo para sub, client, iat, exp, expiresIn y dos clientes validos distintos; verificar que fallan por la funcionalidad aun ausente, manteniendo verde la caracterizacion.
+- [x] 3.2 Implementar el servicio CDI de tokens con Clock inyectable, firma HS256 mediante Nimbus y resultado token/duracion, sin conexion aun al login; verificar que pasan las pruebas de emision y `exp - iat = expiresIn = 3600` usando una sola captura temporal.
+- [x] 3.3 Probar cliente con espacios externos y mayusculas y revisar datos recuperables del token; verificar preservacion exacta de client y ausencia de secreto, password, hash y displayName en el payload.
+- [x] 3.4 Probar la coherencia `abs(expiresIn - (exp - now)) <= 2` en el instante de emision con reloj controlado; verificar resultados deterministas sin esperas ni medicion de latencia de red y documentar la referencia temporal junto a esa evidencia.
 
 ## 4. Verificacion interna y expiracion
 
-- [ ] 4.1 Agregar pruebas de token autentico, clave distinta, claims/firma alterados, `none`, algoritmos no autorizados y estructura o claims obligatorios invalidos; verificar fallos esperados antes de implementar el verificador y no crear endpoints.
-- [ ] 4.2 Implementar verificacion interna con HS256 fijado por el servidor y claims confiables solo tras comprobar firma; verificar la bateria anterior y rechazo del formato legacy, manteniendo emision y verificacion independientes del Resource HTTP.
-- [ ] 4.3 Agregar e implementar controles temporales con Clock fijo en `exp - 1`, `exp` y `exp + 1`; verificar aceptacion solo antes de exp, tiempos coherentes y ningun margen adicional de validez.
-- [ ] 4.4 Verificar tipos y obligatoriedad de sub/client/iat/exp, incluida la misma regla de cliente no vacio ni blancos y su preservacion exacta; comprobar rechazo mediante tokens de prueba firmados con claims invalidos, no solo tokens con firma alterada.
-- [ ] 4.5 Documentar el alcance de la verificacion y la decision HS256 con Nimbus frente a las alternativas; verificar que no se promete validacion en salud ni consumidores externos, cifrado, revocacion o proteccion contra replay.
+- [x] 4.1 Agregar pruebas de token autentico, clave distinta, claims/firma alterados, `none`, algoritmos no autorizados y estructura o claims obligatorios invalidos; verificar fallos esperados antes de implementar el verificador y no crear endpoints.
+- [x] 4.2 Implementar verificacion interna con HS256 fijado por el servidor y claims confiables solo tras comprobar firma; verificar la bateria anterior y rechazo del formato legacy, manteniendo emision y verificacion independientes del Resource HTTP.
+- [x] 4.3 Agregar e implementar controles temporales con Clock fijo en `exp - 1`, `exp` y `exp + 1`; verificar aceptacion solo antes de exp, tiempos coherentes y ningun margen adicional de validez.
+- [x] 4.4 Verificar tipos y obligatoriedad de sub/client/iat/exp, incluida la misma regla de cliente no vacio ni blancos y su preservacion exacta; comprobar rechazo mediante tokens de prueba firmados con claims invalidos, no solo tokens con firma alterada.
+- [x] 4.5 Documentar el alcance de la verificacion y la decision HS256 con Nimbus frente a las alternativas; verificar que no se promete validacion en salud ni consumidores externos, cifrado, revocacion o proteccion contra replay.
 
 ## 5. Integracion del login y cliente aprobado
 
-- [ ] 5.1 Agregar pruebas HTTP de client ausente, null, vacio y blancos con credenciales validas; verificar fallo esperado antes del cambio y resultado objetivo 400 con `{"message":"Client is required"}`, sin token.
-- [ ] 5.2 Agregar pruebas de prioridad y clientes validos: credenciales invalidas con client ausente conservan 401; request/username/password invalidos conservan sus 400; strings no blancos arbitrarios se aceptan sin lista ni normalizacion. Verificar los resultados exactos de cada caso.
-- [ ] 5.3 Integrar validacion de client tras autenticar y nueva emision en AuthResource, tomando expiresIn del resultado del servicio; verificar las pruebas 5.1/5.2 y que un login valido entrega claims de su usuario y cliente sin alterar el resto del JSON publico.
-- [ ] 5.4 Sustituir solo las expectativas legacy afectadas en la caracterizacion y retirar la emision legacy sin fallback; verificar suite HTTP verde, rechazo legacy en el verificador y ausencia de llamadas productivas a LegacyTokenUtil.
-- [ ] 5.5 Documentar el nuevo contrato en un complemento al baseline del Dia 1, con client obligatorio, orden de errores, formato firmado y nuevo login; verificar correspondencia con las pruebas y preservar docs/ENDPOINTS.md como referencia historica, sin inspeccionar consumidores.
+- [x] 5.1 Agregar pruebas HTTP de client ausente, null, vacio y blancos con credenciales validas; verificar fallo esperado antes del cambio y resultado objetivo 400 con `{"message":"Client is required"}`, sin token.
+- [x] 5.2 Agregar pruebas de prioridad y clientes validos: credenciales invalidas con client ausente conservan 401; request/username/password invalidos conservan sus 400; strings no blancos arbitrarios se aceptan sin lista ni normalizacion. Verificar los resultados exactos de cada caso.
+- [x] 5.3 Integrar validacion de client tras autenticar y nueva emision en AuthResource, tomando expiresIn del resultado del servicio; verificar las pruebas 5.1/5.2 y que un login valido entrega claims de su usuario y cliente sin alterar el resto del JSON publico.
+- [x] 5.4 Sustituir solo las expectativas legacy afectadas en la caracterizacion y retirar la emision legacy sin fallback; verificar suite HTTP verde, rechazo legacy en el verificador y ausencia de llamadas productivas a LegacyTokenUtil.
+- [x] 5.5 Documentar el nuevo contrato en un complemento al baseline del Dia 1, con client obligatorio, orden de errores, formato firmado y nuevo login; verificar correspondencia con las pruebas y preservar docs/ENDPOINTS.md como referencia historica, sin inspeccionar consumidores.
 
 ## 6. Logs y evidencia sin valores sensibles
 
-- [ ] 6.1 Agregar captura de logs/stdout/stderr con datos sinteticos para exito, credenciales invalidas, excepciones del Resource y errores JDBC controlados; verificar ausencia de tokens, secretos, passwords, hashes y sus representaciones reversibles en la salida original, sin volcarla a informes sensibles.
-- [ ] 6.2 Corregir exclusivamente las emisiones sensibles detectadas, reemplazando stack traces JDBC por eventos fijos cuando sea necesario; verificar las pruebas de logs y mantener retorno null/401, esquema HTTP de errores, consultas y almacenamiento sin otros cambios.
-- [ ] 6.3 Adjuntar evidencia redactada de logs y resultados de pruebas al documento de evidencia del Issue, junto con los comandos reproducibles; verificar que permite identificar cada caso sin exponer valores sensibles y sin ocultar filtraciones en logs originales.
+- [x] 6.1 Agregar captura de logs/stdout/stderr con datos sinteticos para exito, credenciales invalidas, excepciones del Resource y errores JDBC controlados; verificar ausencia de tokens, secretos, passwords, hashes y sus representaciones reversibles en la salida original, sin volcarla a informes sensibles.
+- [x] 6.2 Corregir exclusivamente las emisiones sensibles detectadas, reemplazando stack traces JDBC por eventos fijos cuando sea necesario; verificar las pruebas de logs y mantener retorno null/401, esquema HTTP de errores, consultas y almacenamiento sin otros cambios.
+- [x] 6.3 Adjuntar evidencia redactada de logs y resultados de pruebas al documento de evidencia del Issue, junto con los comandos reproducibles; verificar que permite identificar cada caso sin exponer valores sensibles y sin ocultar filtraciones en logs originales.
 
 ## 7. Validacion integrada y revision del Issue
 
-- [ ] 7.1 Ejecutar `mvn verify` con secreto sintetico explicito y SQLite temporal; verificar pruebas completas y reportes de cobertura disponibles, sin bypass de gates ni declaraciones de cobertura sin reporte.
-- [ ] 7.2 Contrastar login/errores/salud del artefacto empaquetado en el entorno aislado contra la caracterizacion y nuevos escenarios; verificar cuerpos, status y que no se activaron filtros Bearer ni endpoints adicionales.
-- [ ] 7.3 Revisar en laboratorio el procedimiento de activacion/rollback de design.md; verificar que no modifica SQLite, no reutiliza claves expuestas y detiene emision antes que volver automaticamente al token inseguro si no existe predecesor firmado seguro.
-- [ ] 7.4 Consolidar la trazabilidad entre criterios del Issue #12, escenarios, pruebas y evidencia redactada; verificar decision tecnica/configuracion documentadas y que SQL parametrizado, hashing, CORS, saneamiento de debug/errores y otros repositorios no se incorporaron como trabajo secundario.
-- [ ] 7.5 Ejecutar `openspec validate hu01-signed-token-claims --strict --json` y revisar diff final en feature/HU01; verificar cero errores/advertencias OpenSpec, cambios solo del alcance aprobado y checkboxes marcados unicamente con evidencia real.
+- [x] 7.1 Ejecutar `mvn verify` con secreto sintetico explicito y SQLite temporal; verificar pruebas completas y reportes de cobertura disponibles, sin bypass de gates ni declaraciones de cobertura sin reporte.
+- [x] 7.2 Contrastar login/errores/salud del artefacto empaquetado en el entorno aislado contra la caracterizacion y nuevos escenarios; verificar cuerpos, status y que no se activaron filtros Bearer ni endpoints adicionales.
+- [x] 7.3 Revisar en laboratorio el procedimiento de activacion/rollback de design.md; verificar que no modifica SQLite, no reutiliza claves expuestas y detiene emision antes que volver automaticamente al token inseguro si no existe predecesor firmado seguro.
+- [x] 7.4 Consolidar la trazabilidad entre criterios del Issue #12, escenarios, pruebas y evidencia redactada; verificar decision tecnica/configuracion documentadas y que SQL parametrizado, hashing, CORS, saneamiento de debug/errores y otros repositorios no se incorporaron como trabajo secundario.
+- [x] 7.5 Ejecutar `openspec validate hu01-signed-token-claims --strict --json` y revisar diff final en feature/HU01; verificar cero errores/advertencias OpenSpec, cambios solo del alcance aprobado y checkboxes marcados unicamente con evidencia real.

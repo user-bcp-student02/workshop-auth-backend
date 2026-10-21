@@ -19,16 +19,34 @@ Configurar `AUTH_DB_URL` hacia una SQLite exclusiva del laboratorio antes de ini
 Surefire y Failsafe proporcionan explicitamente una clave sintetica conocida solo a sus JVM de pruebas y una base temporal protegida. La clave sintetica no es un default de la aplicacion y nunca debe utilizarse en un despliegue.
 
 ```powershell
-mvn '-Dtest=TokenSecretTest,AuthResourceTest' test
+mvn test
 ```
 
 El recurso de aislamiento sigue rechazando archivos SQLite preexistentes o ajenos a target. No se omiten pruebas ni se cambia la base del laboratorio.
+
+Build limpio, integracion prod y cobertura:
+
+```powershell
+mvn clean verify quarkus:build failsafe:integration-test failsafe:verify jacoco:report
+```
+
+Usar build limpio al retirar el emisor legacy evita distribuir clases obsoletas de compilaciones anteriores. Los reportes locales estan bajo target/surefire-reports, target/failsafe-reports y target/site/jacoco.
 
 ## Decision criptografica
 
 Se usa Nimbus JOSE JWT 10.10 y HS256: JWT/JWS define el formato y HMAC la firma, no son alternativas excluyentes. No se implementan parsing o criptografia propios. No se instala un filtro Bearer ni se verifica un token en salud.
 
 HS256 requiere proteger el secreto: quien lo conoce puede firmar. JWT firmado no cifra los claims, no evita replay y no implementa revocacion. La verificacion interna no demuestra que un consumidor externo la ejecute. No se inspeccionan ni modifican otros repositorios.
+
+## Contrato de login actualizado
+
+POST /auth/login sigue siendo publico y JSON. Se conserva la validacion request/username/password y luego la autenticacion exacta. Solo tras credenciales validas se exige client string no vacio ni blancos segun String.trim(): ausencia, null, vacio o blancos devuelve 400 con `{"message":"Client is required"}`, sin token. Credenciales incorrectas conservan el 401 del baseline incluso si client es invalido.
+
+Client no tiene lista de permitidos ni normalizacion: espacios externos y mayusculas se conservan exactamente en su claim. La identidad y el rol siguen procediendo de SQLite, no de campos extra del request.
+
+El 200 conserva token string, expiresIn entero 3600, user y debug literal authenticated-with-legacy-flow. Token ahora es JWT/JWS HS256 y contiene sub, client, iat, exp y el dato de rol almacenado. iat/exp son segundos Unix: exp-iat=3600. El margen de coherencia al observar emision es 2 segundos, nunca una ampliacion de vigencia. El verificador rechaza desde now=exp y no acepta tokens legacy.
+
+El formato rompe la decodificacion legacy y exige nuevo login. No se agregan refresh, sesiones, endpoints protegidos ni verificacion en /q/health. Los errores y campos publicos ajenos a esos cambios se mantienen segun el baseline.
 
 ## Activacion y rollback
 

@@ -2,15 +2,23 @@ package com.bcp.workshop.auth;
 
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
 import jakarta.ws.rs.core.Response;
+import com.nimbusds.jwt.JWTClaimsSet;
 import org.junit.jupiter.api.Test;
 
-import java.nio.charset.StandardCharsets;
 import java.sql.DriverManager;
 import java.time.Instant;
-import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.io.ByteArrayOutputStream;
+import java.io.PrintStream;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
+import java.util.logging.Handler;
+import java.util.logging.LogRecord;
+import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.is;
@@ -20,10 +28,14 @@ import static org.hamcrest.Matchers.instanceOf;
 import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 @QuarkusTest
 @QuarkusTestResource(IsolatedDatabaseResource.class)
 class AuthResourceTest {
+    @Inject
+    TokenService tokens;
+
     @Test
     void logsInWithWorkshopUser() {
         given()
@@ -131,40 +143,62 @@ class AuthResourceTest {
     }
 
     @Test
-    void characterizesClientAsOptionalAndIgnoredBeforeTheApprovedChange() {
+    void requiresClientAfterSuccessfulAuthentication() {
         for (String requestJson : List.of(
                 "{\"username\":\"student\",\"password\":\"Workshop123!\"}",
                 "{\"username\":\"student\",\"password\":\"Workshop123!\",\"client\":null}",
                 "{\"username\":\"student\",\"password\":\"Workshop123!\",\"client\":\"\"}",
-                "{\"username\":\"student\",\"password\":\"Workshop123!\",\"client\":\"   \"}",
-                "{\"username\":\"student\",\"password\":\"Workshop123!\",\"client\":\"other-client\"}")) {
-            given()
+                "{\"username\":\"student\",\"password\":\"Workshop123!\",\"client\":\" \\t \"}")) {
+            assertLoginError(requestJson, 400, "Client is required");
+        }
+    }
+
+    @Test
+    void preservesCredentialErrorsBeforeClientValidation() {
+        assertLoginError("{}", 400, "Username is required");
+        assertLoginError("{\"username\":\"student\"}", 400, "Password is required");
+        for (String clientField : List.of("", ",\"client\":null", ",\"client\":\"\"", ",\"client\":\"   \"")) {
+            assertLoginError("{\"username\":\"student\",\"password\":\"wrong\"" + clientField + "}",
+                    401, "Invalid user student or password");
+        }
+    }
+
+    @Test
+    void acceptsValidatedClientsWithoutNormalizationOrAllowlist() throws Exception {
+        for (String client : List.of(" Angular-Workshop ", "other-client")) {
+            String token = given()
                     .contentType("application/json")
-                    .body(requestJson)
+                    .body(Map.of("username", "student", "password", "Workshop123!", "client", client))
                     .when().post("/auth/login")
                     .then()
                     .statusCode(200)
                     .body("keySet()", containsInAnyOrder("token", "expiresIn", "user", "debug"))
                     .body("user.username", is("student"))
-                    .body("expiresIn", is(3600));
+                        .body("expiresIn", is(3600))
+                        .extract().path("token");
+                    assertEquals(client, tokens.verify(token).getStringClaim("client"));
         }
     }
 
     @Test
-    void characterizesLegacyTokenFieldsWithoutFixingTheEmbeddedSecret() {
+                void returnsSignedClaimsFromStoredIdentityAndDeclaredExpiry() throws Exception {
         long beforeLogin = Instant.now().getEpochSecond();
         String token = given()
                 .contentType("application/json")
-                .body(Map.of("username", "student", "password", "Workshop123!"))
+                .body(Map.of("username", "student", "password", "Workshop123!", "client", "angular-workshop",
+                    "sub", "forged-user", "role", "ADMIN"))
                 .when().post("/auth/login")
                 .then().statusCode(200)
                 .extract().path("token");
         long afterLogin = Instant.now().getEpochSecond();
-        String[] fields = new String(Base64.getDecoder().decode(token), StandardCharsets.UTF_8).split("\\|", -1);
-        assertEquals(4, fields.length);
-        assertEquals("student", fields[0]);
-        assertEquals("STUDENT", fields[1]);
-        long expiry = Long.parseLong(fields[2]);
+        JWTClaimsSet claims = tokens.verify(token);
+        assertEquals("student", claims.getSubject());
+        assertEquals("STUDENT", claims.getStringClaim("role"));
+        assertEquals("angular-workshop", claims.getStringClaim("client"));
+        long issuedAt = claims.getIssueTime().toInstant().getEpochSecond();
+        long expiry = claims.getExpirationTime().toInstant().getEpochSecond();
+        assertTrue(issuedAt >= beforeLogin && issuedAt <= afterLogin);
+        assertEquals(3600, expiry - issuedAt);
         assertTrue(expiry >= beforeLogin + 3600 && expiry <= afterLogin + 3600);
     }
 
@@ -178,6 +212,79 @@ class AuthResourceTest {
                 .contentType("application/json")
                 .body("keySet()", containsInAnyOrder("message"))
                 .body("message", is(expectedMessage));
+    }
+
+    @Test
+    void successfulLoginDoesNotLogSensitiveValues() throws Exception {
+        String[] issued = {""};
+        String log = captureDiagnostics(() -> issued[0] = given().contentType("application/json")
+                .body(Map.of("username", "student", "password", "Workshop123!", "client", "test-client"))
+                .when().post("/auth/login").then().statusCode(200).extract().path("token"));
+        assertSafeDiagnostics(log, issued[0]);
+    }
+
+    @Test
+    void authenticationAndJdbcFailuresUseSafeDiagnostics() throws Exception {
+        String log = captureDiagnostics(() -> {
+            assertLoginError("{\"username\":\"student\",\"password\":\"synthetic-password\"}",
+                    401, "Invalid user student or password");
+            assertCapturedFailure(new IllegalStateException("synthetic-password"), "synthetic-password");
+            returnsUnauthorizedWhenTheIsolatedCredentialQueryFails();
+        });
+        assertSafeDiagnostics(log, "");
+        assertTrue(log.contains("Credential lookup failed"), "Use a fixed diagnostic for JDBC errors");
+        assertFalse(log.contains("org.sqlite.SQLiteException"), "Do not dump JDBC exceptions");
+    }
+
+    private void assertSafeDiagnostics(String log, String token) {
+        String secret = System.getenv("AUTH_TOKEN_SECRET");
+        for (String sensitive : List.of("Workshop123!", "synthetic-password", "Characterization123!", secret,
+                new String(Base64.getDecoder().decode(secret), StandardCharsets.UTF_8))) {
+            assertFalse(log.contains(sensitive), "Sensitive values must not appear in diagnostics");
+            assertFalse(log.contains(Base64.getEncoder().encodeToString(sensitive.getBytes(StandardCharsets.UTF_8))),
+                    "Reversible encodings must not appear in diagnostics");
+        }
+        if (!token.isEmpty()) {
+            assertFalse(log.contains(token), "Tokens must not appear in diagnostics");
+        }
+    }
+
+    private String captureDiagnostics(CheckedAction action) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        PrintStream previousOut = System.out;
+        PrintStream previousError = System.err;
+        StringBuilder messages = new StringBuilder();
+        Handler handler = new Handler() {
+            @Override
+            public void publish(LogRecord record) {
+                messages.append(new SimpleFormatter().format(record));
+            }
+
+            @Override
+            public void flush() {
+            }
+
+            @Override
+            public void close() {
+            }
+        };
+        Logger logger = Logger.getLogger("");
+        logger.addHandler(handler);
+        try (PrintStream captured = new PrintStream(output, true, StandardCharsets.UTF_8)) {
+            System.setOut(captured);
+            System.setErr(captured);
+            action.run();
+        } finally {
+            System.setOut(previousOut);
+            System.setErr(previousError);
+            logger.removeHandler(handler);
+        }
+        return messages + output.toString(StandardCharsets.UTF_8);
+    }
+
+    @FunctionalInterface
+    private interface CheckedAction {
+        void run() throws Exception;
     }
 
     private void assertCapturedFailure(IllegalStateException failure, String expectedMessage) {
